@@ -6,6 +6,9 @@ dist/
 release/
 release-v*/
 
+# Independent local repository
+teixeira-gestao/
+
 # Local environment files
 .env
 .env.*
