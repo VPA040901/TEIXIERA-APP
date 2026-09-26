@@ -1,0 +1,126 @@
+{
+  "$schema": "./leanai.config.schema.json",
+  "produto": "LeanAI",
+  "descricao": "Sistema operacional inteligente para empresas, compatível com Claude Code e Codex.",
+  "engineVersion": "1.1.0",
+  "local": {
+    "modo": "local",
+    "nota": "LOCAL-FIRST. Tudo da empresa fica na pasta da instalação. O GitHub serve só para baixar o LeanAI e consultar atualizações. Nenhum dado sai da máquina.",
+    "pushDesativado": true,
+    "remotoBase": "leanai",
+    "repositorioBase": "https://github.com/leangiraldes/LeanAI.git",
+    "urlPushBloqueada": "PUSH-BLOQUEADO-LEANAI-E-SOMENTE-LEITURA",
+    "versionadoLocalmente": [
+      "_memoria",
+      "identidade",
+      "marketing",
+      "saidas",
+      "projetos",
+      "scripts"
+    ],
+    "nuncaVersionado": [
+      "dados",
+      ".env",
+      "credenciais",
+      "tokens",
+      "cookies",
+      "sessões",
+      "bancos locais",
+      "uploads"
+    ]
+  },
+  "fonteCanonica": {
+    "skills": "skills",
+    "regras": "core/regras",
+    "templates": "core/templates"
+  },
+  "workspace": {
+    "memoria": "_memoria",
+    "identidade": "identidade",
+    "dados": "dados",
+    "marketing": "marketing",
+    "saidas": "saidas",
+    "projetos": "projetos",
+    "scripts": "scripts"
+  },
+  "agentes": {
+    "claude": {
+      "nome": "Claude Code",
+      "habilitado": false,
+      "skillsDir": ".claude/skills",
+      "arquivoRegras": "CLAUDE.md",
+      "sintaxeInvocacao": "/{skill}",
+      "deteccao": {
+        "comando": "claude",
+        "flagVersao": "--version"
+      },
+      "docs": "https://code.claude.com/docs/en/skills",
+      "frontmatterPermitido": [
+        "name",
+        "description",
+        "when_to_use",
+        "allowed-tools",
+        "disallowed-tools",
+        "argument-hint",
+        "arguments",
+        "disable-model-invocation",
+        "user-invocable",
+        "context",
+        "agent",
+        "background",
+        "model",
+        "effort",
+        "paths",
+        "shell",
+        "metadata",
+        "license",
+        "compatibility"
+      ]
+    },
+    "codex": {
+      "nome": "Codex",
+      "habilitado": true,
+      "skillsDir": ".agents/skills",
+      "arquivoRegras": "AGENTS.md",
+      "sintaxeInvocacao": "${skill}",
+      "deteccao": {
+        "comando": "codex",
+        "flagVersao": "--version"
+      },
+      "docs": "https://developers.openai.com/plugins/build/skills",
+      "frontmatterPermitido": [
+        "name",
+        "description",
+        "metadata"
+      ]
+    }
+  },
+  "origemTecnica": {
+    "projeto": "MazyOS",
+    "repositorio": "https://github.com/mazzeoia/MazyOS.git",
+    "remotoSugerido": "upstream",
+    "commitBase": "83ed079d1fde51b334e9ecbee5a154f4821d59fb",
+    "commitBaseCurto": "83ed079",
+    "commitBaseData": "2026-05-15",
+    "auditadoEm": "2026-09-05",
+    "nota": "Referência técnica apenas. O LeanAI é um repositório independente, não um fork. Este remoto nunca recebe push e nunca é mesclado automaticamente.",
+    "skillsReescritas": [
+      "abrir",
+      "atualizar",
+      "instalar",
+      "mapear-rotinas",
+      "novo-projeto",
+      "salvar"
+    ]
+  },
+  "ordemRegras": [
+    "00-sistema.md",
+    "10-contexto-negocio.md",
+    "20-fluxo-trabalho.md",
+    "30-aprender-com-correcoes.md",
+    "40-manter-contexto.md",
+    "50-criacao-de-skills.md",
+    "60-seguranca-e-git.md"
+  ],
+  "manifesto": "core/.leanai-sync.json"
+}

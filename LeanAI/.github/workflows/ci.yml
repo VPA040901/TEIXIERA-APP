@@ -1,0 +1,104 @@
+name: LeanAI CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: Validar (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows é onde a maioria das instalações de empresa roda:
+        # quebras de linha, caminhos e PowerShell precisam ser testados de verdade.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Estrutura do projeto
+        run: node core/bin/leanai.mjs verify
+
+      - name: Divergência entre fonte canônica e artefatos gerados
+        # Falha se alguém editou .claude/skills/ ou .agents/skills/ à mão,
+        # ou commitou a fonte sem rodar o sync.
+        run: node core/bin/leanai.mjs check
+
+      - name: Sync não produz diferença (artefatos estão commitados)
+        shell: bash
+        run: |
+          node core/bin/leanai.mjs sync
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::sync gerou mudanças — commite os artefatos regenerados"
+            git status --porcelain
+            git --no-pager diff --stat
+            exit 1
+          fi
+          echo "sync é idempotente e os artefatos estão em dia"
+
+      - name: Vazamento de segredos
+        run: node core/bin/leanai.mjs scan
+
+      - name: Suíte de testes e paridade
+        run: node tests/run.mjs
+
+  instalador:
+    name: Instalador (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: install.sh
+        if: runner.os != 'Windows'
+        run: bash installer/install.sh --agentes ambos --nao-interativo
+
+      - name: install.ps1
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./installer/install.ps1 -Agentes ambos -NaoInterativo
+
+      - name: Estado consistente após instalar
+        run: node core/bin/leanai.mjs check
+
+  licenca:
+    name: Guarda de licença
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: NOTICE preserva a origem
+        run: |
+          test -f NOTICE.md || { echo "::error::NOTICE.md ausente"; exit 1; }
+          grep -q "mazzeoia/MazyOS" NOTICE.md || { echo "::error::NOTICE.md sem o repositório de origem"; exit 1; }
+          echo "origem preservada"
+
+      - name: Nenhuma licença atribuída sem direito verificado
+        run: |
+          # O projeto de origem não tem licença. Enquanto isso não mudar, adicionar um
+          # LICENSE aqui seria afirmar um direito que não existe.
+          for f in LICENSE LICENSE.md LICENSE.txt COPYING; do
+            if [ -f "$f" ]; then
+              echo "::error::$f existe. Atualize o NOTICE.md com a autorização obtida e remova esta guarda no mesmo commit."
+              exit 1
+            fi
+          done
+          echo "nenhuma licença atribuída indevidamente"

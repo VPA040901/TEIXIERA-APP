@@ -1,0 +1,11 @@
+{
+  "name": "Teixeira Gestão",
+  "short_name": "Teixeira",
+  "description": "Gestão simples para o seu negócio.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f6f4",
+  "theme_color": "#ffffff",
+  "lang": "pt-BR",
+  "icons": [{ "src": "./LOGO.jpg", "sizes": "640x640", "type": "image/jpeg", "purpose": "any" }]
+}

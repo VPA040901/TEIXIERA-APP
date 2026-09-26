@@ -1,0 +1,31 @@
+{
+  "name": "teixeira-gestao-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "main": "electron-main.cjs",
+  "scripts": {
+    "desktop": "electron .",
+    "dist:win": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "br.com.teixeira.gestao",
+    "asar": false,
+    "productName": "Teixeira Gestão",
+    "files": [
+      "index.html",
+      "app.js",
+      "styles.css",
+      "LOGO.jpg",
+      "manifest.webmanifest",
+      "sw.js",
+      "electron-main.cjs"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  }
+}

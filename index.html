@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Teixeira — gestão simples para o seu negócio.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <title>Teixeira • Gestão</title>
+  <link rel="icon" href="./LOGO.jpg">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <section id="login-screen" class="login-screen" aria-labelledby="login-title">
+    <form id="login-form" class="login-card">
+      <img src="./LOGO.jpg" alt="Teixeira" class="login-logo">
+      <span class="login-kicker">TEIXEIRA GESTÃO</span>
+      <h1 id="login-title">Bem-vindo(a)</h1>
+      <p>Acesse seu espaço para organizar pedidos, serviços e clientes.</p>
+      <label>Seu nome ou e-mail<input name="usuario" type="text" autocomplete="username" required placeholder="Digite seu nome ou e-mail"></label>
+      <label>Senha<input name="senha" type="password" autocomplete="current-password" required placeholder="Digite qualquer senha"></label>
+      <button class="login-submit" type="submit">Entrar no sistema</button>
+      <small>Para este acesso local, não há exigência de senha forte.</small>
+    </form>
+  </section>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#inicio" aria-label="Teixeira início"><img src="./LOGO.jpg" alt="Teixeira"><span>GESTÃO</span></a>
+      <div class="workspace-label">ESPAÇO DE TRABALHO</div>
+      <nav id="side-nav" class="nav-list" aria-label="Navegação principal"></nav>
+      <div class="sidebar-bottom"><div class="sync-dot"></div><span>Seus dados ficam neste dispositivo</span></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="menu-toggle" aria-label="Abrir menu">☰</button>
+        <div class="breadcrumb"><span>Teixeira</span><b>/</b><strong id="page-crumb">Visão geral</strong></div>
+        <div class="top-actions"><button id="audio-assistant" type="button" hidden aria-hidden="true"></button><button class="icon-button" id="global-search-btn" aria-label="Pesquisar">⌕</button><button class="avatar" title="Perfil">T</button></div>
+      </header>
+      <section id="view" class="view" tabindex="-1"></section>
+      <nav id="bottom-nav" class="bottom-nav" aria-label="Navegação mobile"></nav>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="./app.js"></script>
+  <script>if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});</script>
+  <script>
+    /* Mantém a ação de voz junto da ação principal da tela inicial. */
+    (() => {
+      const placeVoiceButton = () => {
+        const voice = document.querySelector('.audio-home');
+        const newOrder = document.querySelector('.home-primary[data-type="pedidos"]');
+        if (!voice || !newOrder || newOrder.parentElement?.classList.contains('home-primary-actions')) return;
+        const actions = document.createElement('div');
+        actions.className = 'home-primary-actions';
+        newOrder.replaceWith(actions);
+        actions.append(voice, newOrder);
+      };
+      new MutationObserver(placeVoiceButton).observe(document.querySelector('#view'), { childList: true, subtree: true });
+      addEventListener('DOMContentLoaded', placeVoiceButton);
+    })();
+  </script>
+  <script>
+    (() => {
+      const screen = document.querySelector('#login-screen');
+      const form = document.querySelector('#login-form');
+      if (localStorage.getItem('teixeira-local-session')) screen.hidden = true;
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        localStorage.setItem('teixeira-local-session', JSON.stringify({ user: data.get('usuario'), signedInAt: new Date().toISOString() }));
+        screen.hidden = true;
+      });
+    })();
+  </script>
+  <script>
+    /* Vínculos de catálogo: produtos e serviços já cadastrados nos formulários. */
+    (() => {
+      const currency = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
+      const itemId = () => crypto.randomUUID();
+      const getLinked = form => { try { return JSON.parse(form.dataset.linkedItems || '[]'); } catch { return []; } };
+      const setLinked = (form, items) => { form.dataset.linkedItems = JSON.stringify(items); const field = form.querySelector('[name="itensVinculados"]'); if (field) field.value = JSON.stringify(items); };
+      const applyOrderTotal = form => {
+        const items = getLinked(form); if (!items.length) return;
+        const quantity = Math.max(1, Number(form.elements.quantidade?.value) || 1);
+        const discount = Number(form.elements.desconto?.value) || 0;
+        const extra = Number(form.elements.outrosCustos?.value) || 0;
+        form.elements.descricao.value = items.map(item => item.name).join(' + ');
+        form.elements.total.value = Math.max(0, items.reduce((sum, item) => sum + item.price, 0) * quantity - discount + extra).toFixed(2);
+      };
+      const makeOption = (select, type, item) => { const option = document.createElement('option'); option.value = item.id; option.textContent = `${type === 'product' ? 'Produto' : 'Serviço'} · ${item.nome} · ${currency(item.preco)}`; option.dataset.type = type; option.dataset.name = item.nome; option.dataset.price = Number(item.preco) || 0; select.append(option); };
+      const insertCatalog = form => {
+        if (form.dataset.catalogReady) return; form.dataset.catalogReady = '1';
+        const type = form.dataset.type;
+        if (!['pedidos', 'agenda', 'documentos'].includes(type)) return;
+        const records = [...(db.produtos || []).map(item => ({ type: 'product', item })), ...(db.servicos || []).map(item => ({ type: 'service', item }))];
+        if (!records.length) return;
+        const section = document.createElement('section'); section.className = 'catalog-linker field full';
+        const title = type === 'pedidos' ? 'Adicionar itens já cadastrados' : type === 'agenda' ? 'Vincular serviço cadastrado' : 'Adicionar item cadastrado';
+        const select = document.createElement('select'); select.setAttribute('aria-label', title);
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Selecione no catálogo…'; select.append(placeholder);
+        records.forEach(({ type, item }) => makeOption(select, type, item));
+        const add = document.createElement('button'); add.type = 'button'; add.className = 'catalog-add'; add.textContent = type === 'agenda' ? 'Usar serviço' : '+ Adicionar';
+        const list = document.createElement('div'); list.className = 'catalog-linked-list';
+        section.innerHTML = `<strong>${title}</strong><p>${type === 'pedidos' ? 'Selecione quantos produtos e serviços precisar. Os valores são preenchidos automaticamente.' : 'Use um cadastro existente para evitar digitar novamente.'}</p>`;
+        const controls = document.createElement('div'); controls.className = 'catalog-controls'; controls.append(select, add); section.append(controls, list);
+        const grid = form.querySelector('.form-grid');
+        const descriptionField = form.elements.descricao?.closest('.field');
+        if (type === 'pedidos') {
+          form.elements.produto?.closest('.field')?.setAttribute('hidden', '');
+          form.elements.servico?.closest('.field')?.setAttribute('hidden', '');
+        }
+        if (descriptionField) grid.insertBefore(section, descriptionField); else grid.append(section);
+        const refresh = () => {
+          const items = getLinked(form); list.replaceChildren();
+          items.forEach(linked => { const row = document.createElement('div'); row.className = 'catalog-linked'; const name = document.createElement('span'); name.textContent = `${linked.kind === 'product' ? 'Produto' : 'Serviço'} · ${linked.name}`; const price = document.createElement('b'); price.textContent = currency(linked.price); const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `Remover ${linked.name}`); remove.onclick = () => { setLinked(form, getLinked(form).filter(item => item.id !== linked.id)); refresh(); applyOrderTotal(form); }; row.append(name, price, remove); list.append(row); });
+          if (type === 'pedidos') applyOrderTotal(form);
+        };
+        add.onclick = () => { const choice = select.selectedOptions[0]; if (!choice?.value) return; const item = { id: itemId(), sourceId: choice.value, kind: choice.dataset.type, name: choice.dataset.name, price: Number(choice.dataset.price) || 0 }; if (type === 'agenda') { form.elements.titulo.value = item.name; form.elements.servicoVinculado.value = JSON.stringify(item); } else { setLinked(form, [...getLinked(form), item]); if (type === 'documentos') { form.elements.descricao.value = getLinked(form).map(value => value.name).join(' + '); form.elements.total.value = getLinked(form).reduce((sum, value) => sum + value.price, 0).toFixed(2); } refresh(); } select.value = ''; };
+        const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = type === 'agenda' ? 'servicoVinculado' : 'itensVinculados'; section.append(hidden); refresh();
+      };
+      const scan = () => document.querySelectorAll('#record-form[data-type]').forEach(insertCatalog);
+      new MutationObserver(scan).observe(document.querySelector('#modal-root'), { childList: true, subtree: true });
+      addEventListener('DOMContentLoaded', scan);
+    })();
+  </script>
+</body>
+</html>

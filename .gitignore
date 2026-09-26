@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Electron build artifacts
+dist/
+release/
+release-v*/
+
+# Local environment files
+.env
+.env.*
+
+# Logs
+*.log
