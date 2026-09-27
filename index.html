@@ -18,7 +18,7 @@
       <h1 id="login-title">Bem-vindo(a)</h1>
       <p>Acesse seu espaço para organizar pedidos, serviços e clientes.</p>
       <label>Seu nome ou e-mail<input name="usuario" type="text" autocomplete="username" required placeholder="Digite seu nome ou e-mail"></label>
-      <label>Senha<input name="senha" type="password" autocomplete="current-password" required placeholder="Digite qualquer senha"></label>
+      <label>Senha<input name="senha" type="password" autocomplete="current-password" required placeholder="Digite sua senha"></label>
       <button class="login-submit" type="submit">Entrar no sistema</button>
       <small>Para este acesso local, não há exigência de senha forte.</small>
     </form>
@@ -65,12 +65,36 @@
     (() => {
       const screen = document.querySelector('#login-screen');
       const form = document.querySelector('#login-form');
-      if (localStorage.getItem('teixeira-local-session')) screen.hidden = true;
-      form.addEventListener('submit', (event) => {
+      const showError = message => {
+        let error = form.querySelector('.login-error');
+        if (!error) { error = document.createElement('p'); error.className = 'login-error'; error.setAttribute('role', 'alert'); form.append(error); }
+        error.textContent = message;
+      };
+      try {
+        const session = JSON.parse(localStorage.getItem('teixeira-local-session'));
+        if (session?.authenticated === true) screen.hidden = true;
+        else localStorage.removeItem('teixeira-local-session');
+      } catch { localStorage.removeItem('teixeira-local-session'); }
+      form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const data = new FormData(form);
-        localStorage.setItem('teixeira-local-session', JSON.stringify({ user: data.get('usuario'), signedInAt: new Date().toISOString() }));
-        screen.hidden = true;
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+          const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: data.get('usuario'), password: data.get('senha') })
+          });
+          const result = await response.json();
+          if (!response.ok) { showError(result.message || 'Usuário ou senha inválidos.'); return; }
+          localStorage.setItem('teixeira-local-session', JSON.stringify({ user: result.user, authenticated: true, signedInAt: new Date().toISOString() }));
+          screen.hidden = true;
+        } catch {
+          showError('Não foi possível validar o acesso. Tente novamente.');
+        } finally {
+          submit.disabled = false;
+        }
       });
     })();
   </script>
