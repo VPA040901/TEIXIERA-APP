@@ -35,7 +35,7 @@
         <img class="topbar-logo" src="./LOGO.jpg" alt="Teixeira">
         <button class="icon-button mobile-menu" id="menu-toggle" aria-label="Abrir menu">☰</button>
         <div class="breadcrumb"><span>Teixeira</span><b>/</b><strong id="page-crumb">Visão geral</strong></div>
-        <div class="top-actions"><button id="audio-assistant" type="button" hidden aria-hidden="true"></button><button class="icon-button" id="global-search-btn" aria-label="Pesquisar">⌕</button><button class="avatar" title="Perfil">T</button></div>
+        <div class="top-actions"><button id="audio-assistant" type="button" hidden aria-hidden="true"></button><button class="icon-button" id="global-search-btn" aria-label="Pesquisar">⌕</button><button class="logout-button" id="logout-button" type="button">Sair</button><button class="avatar" title="Perfil">T</button></div>
       </header>
       <section id="view" class="view" tabindex="-1"></section>
       <nav id="bottom-nav" class="bottom-nav" aria-label="Navegação mobile"></nav>
@@ -65,6 +65,7 @@
     (() => {
       const screen = document.querySelector('#login-screen');
       const form = document.querySelector('#login-form');
+      const logout = document.querySelector('#logout-button');
       const showError = message => {
         let error = form.querySelector('.login-error');
         if (!error) { error = document.createElement('p'); error.className = 'login-error'; error.setAttribute('role', 'alert'); form.append(error); }
@@ -95,6 +96,13 @@
         } finally {
           submit.disabled = false;
         }
+      });
+      logout.addEventListener('click', () => {
+        localStorage.removeItem('teixeira-local-session');
+        form.reset();
+        form.querySelector('.login-error')?.remove();
+        screen.hidden = false;
+        form.elements.usuario.focus();
       });
     })();
   </script>

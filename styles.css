@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 .login-error{margin:0;padding:9px 11px;border-radius:8px;background:#5a3037;color:#ffd7d9;font-size:11px;font-weight:600}
+.logout-button{border:1px solid var(--line);border-radius:8px;background:#fff;color:#645d57;padding:7px 10px;font-size:11px;font-weight:700}.logout-button:hover{border-color:#c9b8a3;background:#faf7f2;color:var(--ink)}
 
 /* Marca Teixeira em destaque em toda a navegação e acesso. */
 .brand{padding:8px 10px 26px!important}.brand img{width:190px!important;height:56px!important}.brand span{display:none!important}.topbar-logo{width:145px;height:45px;object-fit:contain;object-position:left center}.topbar .breadcrumb{margin-right:auto;margin-left:18px}.login-card{width:min(100%,440px)!important;padding:34px 30px!important}.login-logo{width:min(100%,330px)!important;height:100px!important;object-position:center!important;border-radius:10px!important;padding:8px 14px!important;margin:0 auto 8px!important}#view .modal-form img[src="./LOGO.jpg"]{width:180px!important;height:60px!important;padding:6px!important}@media(max-width:640px){.topbar{padding:0 16px}.topbar-logo{width:128px;height:42px}.topbar .breadcrumb{display:none}}
