@@ -2504,10 +2504,13 @@ function agendaPage(){
         date.getDate()
       ).padStart(2,'0')}`;
 
-    const has =
-      db.agenda.some(
+    const eventCount =
+      db.agenda.filter(
         a => a.data===iso
-      );
+      ).length;
+
+    const has =
+      eventCount>0;
 
     const today =
       iso===todayISO();
@@ -2527,9 +2530,25 @@ function agendaPage(){
         }"
         data-action="select-day"
         data-date="${iso}"
-        title="${has?'Há compromisso':''}"
+        title="${
+          has
+            ? `${eventCount} compromisso${eventCount>1?'s':''}`
+            : 'Nenhum compromisso'
+        }"
+        aria-label="${
+          `${n} de ${monthName}: ${
+            has
+              ? `${eventCount} compromisso${eventCount>1?'s':''}`
+              : 'nenhum compromisso'
+          }`
+        }"
       >
-        ${n}
+        <span class="calendar-day-number">${n}</span>
+        ${
+          has
+            ? `<span class="calendar-event-count">${eventCount}</span>`
+            : ''
+        }
       </button>
     `;
   }
@@ -3560,7 +3579,7 @@ const FIELDS = {
     [
       'forma',
       'Forma de pagamento',
-      'select:Pix|Cartão|Credito|Debito|inheiro|Transferência|Boleto'
+      'select:Pix|Cartão|Credito|Debito|Dinheiro|Transferência|Boleto'
     ],
     [
       'condicao',
