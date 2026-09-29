@@ -2,7 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createClient } from '@supabase/supabase-js';
+import pg from 'pg';
 import { GoogleGenAI } from '@google/genai';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -20,28 +20,25 @@ const types = {
   '.webmanifest': 'application/manifest+json; charset=utf-8'
 };
 
-const supabaseUrl = String(
-  process.env.SUPABASE_URL || ''
-).trim();
-
-const supabaseSecretKey = String(
-  process.env.SUPABASE_SECRET_KEY || ''
+const databaseUrl = String(
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.NEON_DATABASE_URL ||
+  ''
 ).trim();
 
 const geminiApiKey = String(
   process.env.GEMINI_API_KEY || ''
 ).trim();
 
-const supabase =
-  supabaseUrl && supabaseSecretKey
-    ? createClient(supabaseUrl, supabaseSecretKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false
-        }
-      })
-    : null;
+const database = databaseUrl
+  ? new pg.Pool({
+      connectionString: databaseUrl,
+      ssl: databaseUrl.includes('localhost')
+        ? false
+        : { rejectUnauthorized: false }
+    })
+  : null;
 
 const gemini = geminiApiKey
   ? new GoogleGenAI({ apiKey: geminiApiKey })
@@ -92,7 +89,7 @@ function normalizeRows(rows) {
 }
 
 /*
- * Campos principais que possuem colunas próprias no Supabase.
+ * Campos principais preservados para a migração ao Neon.
  * Os demais campos ficam dentro de "dados".
  */
 const TABLES = {
@@ -208,7 +205,7 @@ function mergeRecord(row) {
   };
 }
 
-async function getTable(table) {
+async function legacyGetTable(table) {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -230,7 +227,7 @@ async function getTable(table) {
   return normalizeRows(data).map(mergeRecord);
 }
 
-async function upsertTable(table, rows) {
+async function legacyUpsertTable(table, rows) {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -263,7 +260,7 @@ async function upsertTable(table, rows) {
   if (error) throw error;
 }
 
-async function deleteTableRecord(table, id) {
+async function legacyDeleteTableRecord(table, id) {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -280,7 +277,7 @@ async function deleteTableRecord(table, id) {
   if (error) throw error;
 }
 
-async function getConfig() {
+async function legacyGetConfig() {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -298,7 +295,7 @@ async function getConfig() {
   return mergeRecord(data);
 }
 
-async function saveConfig(config) {
+async function legacySaveConfig(config) {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -370,7 +367,7 @@ async function getAllData() {
   };
 }
 
-async function getDocuments() {
+async function legacyGetDocuments() {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -391,7 +388,7 @@ async function getDocuments() {
   }));
 }
 
-async function saveDocuments(rows) {
+async function legacySaveDocuments(rows) {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -418,7 +415,7 @@ async function saveDocuments(rows) {
   if (error) throw error;
 }
 
-async function deleteDocument(id) {
+async function legacyDeleteDocument(id) {
   if (!supabase) {
     throw new Error('Supabase não configurado no servidor.');
   }
@@ -429,6 +426,97 @@ async function deleteDocument(id) {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+/* Render Postgres: armazena cada registro como JSONB e preserva a API atual. */
+let databaseSetup;
+
+async function requireDatabase() {
+  if (!database) {
+    throw new Error('Banco de dados não configurado no servidor.');
+  }
+
+  databaseSetup ||= database.query(`
+    CREATE TABLE IF NOT EXISTS app_records (
+      type TEXT NOT NULL,
+      id TEXT NOT NULL,
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (type, id)
+    )
+  `);
+
+  await databaseSetup;
+  return database;
+}
+
+async function getRecords(type) {
+  const client = await requireDatabase();
+  const result = await client.query(
+    'SELECT id, data FROM app_records WHERE type = $1 ORDER BY created_at ASC',
+    [type]
+  );
+  return result.rows.map(row => ({ id: row.id, ...row.data }));
+}
+
+async function saveRecords(type, rows) {
+  const normalized = normalizeRows(rows);
+  if (!normalized.length) return;
+
+  const client = await requireDatabase();
+  for (const record of normalized) {
+    const { id = crypto.randomUUID(), ...data } = record;
+    await client.query(
+      `INSERT INTO app_records (type, id, data)
+       VALUES ($1, $2, $3::jsonb)
+       ON CONFLICT (type, id) DO UPDATE SET data = EXCLUDED.data`,
+      [type, String(id), JSON.stringify(data)]
+    );
+  }
+}
+
+async function deleteRecord(type, id) {
+  const client = await requireDatabase();
+  await client.query(
+    'DELETE FROM app_records WHERE type = $1 AND id = $2',
+    [type, String(id)]
+  );
+}
+
+async function getTable(table) {
+  if (!TABLES[table]) throw new Error(`Tabela não permitida: ${table}`);
+  return getRecords(table);
+}
+
+async function upsertTable(table, rows) {
+  if (!TABLES[table]) throw new Error(`Tabela não permitida: ${table}`);
+  await saveRecords(table, rows);
+}
+
+async function deleteTableRecord(table, id) {
+  if (!TABLES[table]) throw new Error(`Tabela não permitida: ${table}`);
+  await deleteRecord(table, id);
+}
+
+async function getConfig() {
+  const records = await getRecords('config');
+  return records[0] || {};
+}
+
+async function saveConfig(config) {
+  await saveRecords('config', [{ id: 'default', ...config }]);
+}
+
+async function getDocuments() {
+  return getRecords('documentos');
+}
+
+async function saveDocuments(rows) {
+  await saveRecords('documentos', rows);
+}
+
+async function deleteDocument(id) {
+  await deleteRecord('documentos', id);
 }
 
 async function interpretWithGemini(body) {
@@ -563,29 +651,28 @@ Formato:
   };
 }
 
-async function testSupabase() {
-  if (!supabase) {
+async function testDatabase() {
+  if (!database) {
     return {
       configured: false,
       connected: false
     };
   }
 
-  const { error } = await supabase
-    .from('config')
-    .select('id')
-    .limit(1);
-
-  return {
-    configured: true,
-    connected: !error,
-    error: error
-      ? error.message
-      : null
-  };
+  try {
+    const client = await requireDatabase();
+    await client.query('SELECT 1');
+    return { configured: true, connected: true, error: null };
+  } catch (error) {
+    return {
+      configured: true,
+      connected: false,
+      error: error instanceof Error ? error.message : 'Falha ao conectar ao banco.'
+    };
+  }
 }
 
-http.createServer(async (req, res) => {
+export async function handler(req, res) {
   try {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
@@ -668,19 +755,19 @@ http.createServer(async (req, res) => {
     ) {
       return sendJson(res, 200, {
         status: 'ok',
-        supabaseConfigured: Boolean(supabase),
+        databaseConfigured: Boolean(database),
         geminiConfigured: Boolean(gemini)
       });
     }
 
     /*
-     * STATUS DO SUPABASE
+     * STATUS DO BANCO DE DADOS
      */
     if (
-      pathname === '/api/supabase/status' &&
+      pathname === '/api/database/status' &&
       req.method === 'GET'
     ) {
-      const status = await testSupabase();
+      const status = await testDatabase();
 
       return sendJson(res, 200, status);
     }
@@ -859,7 +946,9 @@ http.createServer(async (req, res) => {
 
     res.end();
   }
-}).listen(
+}
+
+if (!process.env.VERCEL) http.createServer(handler).listen(
   port,
   '0.0.0.0',
   () => {
